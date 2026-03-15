@@ -282,7 +282,7 @@ class BlendImages:
 		
 		# If img_b is not the same size as img_a - scale img_b to img_a dimensions.
 		if ((aw != bw) or (ah != bh)):
-			img_b.resize((aw, ah), resample=get_pil_resampler("lanczos"))
+			img_b = img_b.resize((aw, ah), resample=get_pil_resampler("lanczos"))
 
 		# Finally, blend the two
 		return conv_pil_tensor(Image.blend(img_a, img_b, blend))
