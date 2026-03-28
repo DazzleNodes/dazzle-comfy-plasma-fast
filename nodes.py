@@ -258,7 +258,8 @@ class BlendImages:
 			"required": {
 				"IMAGE_A": ("IMAGE",),
 				"IMAGE_B": ("IMAGE",),
-				"blend": ("FLOAT", {"default": 0.5, "min": 0, "max": 1, "step": 0.001})
+				"blend": ("FLOAT", {"default": 0.5, "min": 0, "max": 1, "step": 0.001}),
+				"size_mode": (["match A", "match B", "match larger", "match smaller", "exact"],),
 			}
 		}
 
@@ -267,7 +268,7 @@ class BlendImages:
 
 	CATEGORY = "image/postprocessing"
 
-	def process_image(self, IMAGE_A, IMAGE_B, blend):
+	def process_image(self, IMAGE_A, IMAGE_B, blend, size_mode="match A"):
 		# Convert from tensors
 		source_a = conv_tensor_pil(IMAGE_A)
 		source_b = conv_tensor_pil(IMAGE_B)
@@ -279,10 +280,33 @@ class BlendImages:
 		img_a.paste(source_a)
 		img_b = Image.new("RGB", (bw, bh))
 		img_b.paste(source_b)
-		
-		# If img_b is not the same size as img_a - scale img_b to img_a dimensions.
-		if ((aw != bw) or (ah != bh)):
-			img_b = img_b.resize((aw, ah), resample=get_pil_resampler("lanczos"))
+
+		# Resize images to match based on size_mode
+		if (aw != bw) or (ah != bh):
+			if size_mode == "exact":
+				raise ValueError(
+					f"BlendImages: size_mode is 'exact' but images differ: "
+					f"A={aw}x{ah}, B={bw}x{bh}"
+				)
+
+			resample = get_pil_resampler("lanczos")
+			a_pixels = aw * ah
+			b_pixels = bw * bh
+
+			if size_mode == "match A":
+				img_b = img_b.resize((aw, ah), resample=resample)
+			elif size_mode == "match B":
+				img_a = img_a.resize((bw, bh), resample=resample)
+			elif size_mode == "match larger":
+				if a_pixels >= b_pixels:
+					img_b = img_b.resize((aw, ah), resample=resample)
+				else:
+					img_a = img_a.resize((bw, bh), resample=resample)
+			elif size_mode == "match smaller":
+				if a_pixels <= b_pixels:
+					img_b = img_b.resize((aw, ah), resample=resample)
+				else:
+					img_a = img_a.resize((bw, bh), resample=resample)
 
 		# Finally, blend the two
 		return conv_pil_tensor(Image.blend(img_a, img_b, blend))
